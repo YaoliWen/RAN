@@ -28,17 +28,29 @@ def load_imgs(img_dir, image_list_file, label_file):
             for line in imf:
                 
                 space_index = line.find(' ')
+                slash_index = line.find('/')
                 
-                video_name = line[0:space_index]  # name of video
+                # video_name = line[0:space_index]  # name of video
+                video_name = line[slash_index+1 : space_index]  # name of video
                 img_count = line[space_index+1:]  # number of frames in video
-                
-                video_path = os.path.join(img_dir, video_name)# video_path is the path of each video
+                print("slash_index {}".format(slash_index))
+                print(video_name)
+                if slash_index == -1:
+                    break
+                elif video_name < "fer0028639":
+                    video_path = os.path.join(img_dir, 'FER2013Train')
+                elif video_name >= "fer0028639" and video_name < "fer0032220":
+                    video_path = os.path.join(img_dir, 'FER2013Valid')
+                elif video_name >= "fer0032220":
+                    video_path = os.path.join(img_dir, 'FER2013Test')
+                video_path = os.path.join(video_path, video_name)# video_path is the path of each video
                 ###  for sampling triple imgs in the single video_path  ####
-                
+                print(video_path)
                 img_lists = listdir(video_path)
                 # pdb.set_trace()
                 record = laf.readline().strip().split()
                 img_lists.sort()  #  sort files by ascending
+                # print(img_lists)
                 img_path_first =    video_path+'/'+img_lists[0]
                 img_path_second = video_path + '/'+img_lists[1]
                 img_path_third = video_path + '/'+img_lists[2]
