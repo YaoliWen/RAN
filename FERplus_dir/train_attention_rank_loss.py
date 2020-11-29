@@ -15,6 +15,7 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 import math
 from attention_rank_loss import resnet18,resnet34
+from new_model import resnet18 as new_resnet18
 import attention_rank_loss
 #from part_attentioon_sample_fly import MsCelebDataset, CaffeCrop
 from part_attention_sample import MsCelebDataset, CaffeCrop
@@ -75,11 +76,11 @@ def main():
 
     print('img_dir:', args.img_dir)
     print('end2end?:', args.end2end)
-    args_img_dir='/157Dataset/data-wen.yaoli/Data/FERplus/Alignment/'
+    args_img_dir='/home/phd-liu.fang/wyl/data/Alignment'
     #args_img_dir = '/media/sdb/kwang/attention_center_crop_range_part_face/train/'
     # load data and prepare dataset
-    train_list_file = '/home/lab-wen.yaoli/CODE/git/Region-Attention-Network/FERplus_dir/dlib_ferplus_train_center_crop_range_list.txt'
-    train_label_file = '/home/lab-wen.yaoli/CODE/git/Region-Attention-Network/FERplus_dir/dlib_ferplus_train_center_crop_range_label.txt'
+    train_list_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_list.txt'
+    train_label_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_label.txt'
     #train_list_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_train_center_crop_list.txt'
     #train_label_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_train_center_crop_label.txt'
     #train_list_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_train_center_crop_range_list.txt'
@@ -89,15 +90,15 @@ def main():
             transforms.Compose([caffe_crop,transforms.ToTensor()]))
 
     
-    args_img_dir_val='/157Dataset/data-wen.yaoli/Data/FERplus/Alignment/'
+    args_img_dir_val='/home/phd-liu.fang/wyl/data/Alignment'
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True)
    
     caffe_crop = CaffeCrop('test')
-    val_list_file = '/home/lab-wen.yaoli/CODE/git/Region-Attention-Network/FERplus_dir/dlib_ferplus_val_center_crop_range_list.txt'
-    val_label_file = '/home/lab-wen.yaoli/CODE/git/Region-Attention-Network/FERplus_dir/dlib_ferplus_val_center_crop_range_label.txt'
+    val_list_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_val_center_crop_range_list.txt'
+    val_label_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_val_center_crop_range_label.txt'
     #val_list_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_val_center_crop_list.txt'
     #val_label_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_val_center_crop_label.txt'
     val_dataset =  MsCelebDataset(args_img_dir_val, val_list_file, val_label_file, 
@@ -115,7 +116,7 @@ def main():
     assert(args.arch in ['resnet18','resnet34','resnet101'])
     if args.arch == 'resnet18':
         #model = Res()
-        model = resnet18(end2end=args.end2end)
+        model = new_resnet18(end2end=args.end2end)
    #     model = resnet18(pretrained=False, nverts=nverts_var,faces=faces_var,shapeMU=shapeMU_var,shapePC=shapePC_var,num_classes=class_num, end2end=args.end2end)
     if args.arch == 'resnet34':
         model = resnet34(end2end=args.end2end)
@@ -262,7 +263,7 @@ def train(train_loader, model, criterion, criterion1, optimizer, epoch, base_bat
         
         
         # compute output
-        pred_score, alphas_part_max, alphas_org = model(input_var)
+        pred_score, alphas_part_max, alphas_org = model(input_var)#[B, 3, 224, 224, 6]
         # pdb.set_trace()
         
         loss = criterion(pred_score, target_var) + criterion1(alphas_part_max, alphas_org)
