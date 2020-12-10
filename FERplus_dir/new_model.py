@@ -188,7 +188,7 @@ class ResNet(nn.Module):
             f = self.layer2(f)
             f = self.layer3(f)
             f = self.layer4(f) 
-            print("layer4:  {}".format(f.shape))
+            # print("layer4:  {}".format(f.shape))
             f = self.avgpool(f) # B*512*1*1
             f = f.squeeze(3).squeeze(2) # B*512
             #MN_MODEL
@@ -197,9 +197,9 @@ class ResNet(nn.Module):
         global_face = vs_stack[:,0,:]
         alphas = self.alpha(vs_stack, global_face) # B*6
         alphas_part_max = alphas[:,1:6].max(dim=1)[0] # B(B*1)
-        # alphas_part_max = alphas_part_max.unsqueeze(1) # B*1
+        alphas_part_max = alphas_part_max.unsqueeze(1) # B*1
         alphas_org = alphas[:,0] # B(B*1)
-        # alphas_org = alphas_org.unsqueeze(1) # B*1
+        alphas_org = alphas_org.unsqueeze(1) # B*1
         vm = vs_stack.mul(alphas.unsqueeze(2)).sum(1) # B*512
         for i in range(len(vs)): #6
             vs[i] = torch.cat([vs[i], vm], dim=1) # B*1024(6*B*1024)

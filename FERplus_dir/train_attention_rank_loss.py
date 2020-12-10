@@ -24,7 +24,9 @@ import numpy as np
 import pdb
 from torch.utils.tensorboard import SummaryWriter
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '3,5,6,7'
+summary_dir = "/157Dataset/data-wen.yaoli/RAN/baseline"
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '4,5,6'
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
@@ -76,11 +78,11 @@ def main():
 
     print('img_dir:', args.img_dir)
     print('end2end?:', args.end2end)
-    args_img_dir='/home/phd-liu.fang/wyl/data/Alignment'
+    args_img_dir='/home/phd-liu.fang/wyl/data/Alignment' #对齐的面部地址
     #args_img_dir = '/media/sdb/kwang/attention_center_crop_range_part_face/train/'
     # load data and prepare dataset
-    train_list_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_list.txt'
-    train_label_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_label.txt'
+    train_list_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_list.txt' #训练集目录txt
+    train_label_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_label.txt' #训练集标签txt
     #train_list_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_train_center_crop_list.txt'
     #train_label_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_train_center_crop_label.txt'
     #train_list_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_train_center_crop_range_list.txt'
@@ -116,7 +118,8 @@ def main():
     assert(args.arch in ['resnet18','resnet34','resnet101'])
     if args.arch == 'resnet18':
         #model = Res()
-        model = new_resnet18(end2end=args.end2end)
+        model = resnet18(end2end=args.end2end)
+        # model = new_resnet18(end2end=args.end2end)
    #     model = resnet18(pretrained=False, nverts=nverts_var,faces=faces_var,shapeMU=shapeMU_var,shapePC=shapePC_var,num_classes=class_num, end2end=args.end2end)
     if args.arch == 'resnet34':
         model = resnet34(end2end=args.end2end)
@@ -156,7 +159,7 @@ def main():
     if args.pretrained:
         
         #checkpoint = torch.load('../../Data/Model/resnet18_ms1m_ferplus_88.pth.tar')
-        checkpoint = torch.load('/home/lab-wen.yaoli/CODE/git/Region-Attention-Network/checkpoint/ijba_res18_naive.pth.tar')
+        checkpoint = torch.load('/home/phd-liu.fang/wyl/data/checkpoint/ijba_res18_naive.pth.tar')
 
         pretrained_state_dict = checkpoint['state_dict']
         model_state_dict = model.state_dict()
@@ -258,27 +261,27 @@ def train(train_loader, model, criterion, criterion1, optimizer, epoch, base_bat
         target = target.cuda()
  
         
-        input_var = torch.autograd.Variable(input)
-        target_var = torch.autograd.Variable(target)    
+        input_var = torch.autograd.Variable(input) # [B, 3, 224, 224, 6]
+        target_var = torch.autograd.Variable(target) # 放入变量图中（意义？）
         
         
         # compute output
-        pred_score, alphas_part_max, alphas_org = model(input_var)#[B, 3, 224, 224, 6]
+        pred_score, alphas_part_max, alphas_org = model(input_var)
         # pdb.set_trace()
         
-        loss = criterion(pred_score, target_var) + criterion1(alphas_part_max, alphas_org)
-        weights_loss = criterion1(alphas_part_max, alphas_org)
+        loss = criterion(pred_score, target_var) + criterion1(alphas_part_max, alphas_org) # 计算出crossentropy和margin loss的平均值
+        weights_loss = criterion1(alphas_part_max, alphas_org) # 计算margin loss 的平均值
         # pdb.set_trace()
         
         # measure accuracy and record loss
-        prec1 = accuracy(pred_score.data, target, topk=(1,))
+        prec1 = accuracy(pred_score.data, target, topk=(1,)) # scalar tensor 该batch正确的百分比
         # pdb.set_trace()
-        losses.update(loss.item(), input.size(0))
+        losses.update(loss.item(), input.size(0)) # 更新losses为总的平均值
         try:
-            weights_losses.update(weights_loss.item(), input.size(0))
+            weights_losses.update(weights_loss.item(), input.size(0)) # 更新weight_losses为总的平均值
         except:
             pdb.set_trace()
-        top1.update(prec1[0], input.size(0))
+        top1.update(prec1[0], input.size(0)) #更新准确率为总的平均值
         
 
         # compute gradient and do SGD step
@@ -297,7 +300,7 @@ def train(train_loader, model, criterion, criterion1, optimizer, epoch, base_bat
         # measure elapsed ti
 
         # measure elapsed time
-        batch_time.update(time.time() - end)
+        batch_time.update(time.time() - end) # 计算总的一个batch平均时间
         end = time.time()
 
         if i % args.print_freq == 0:
@@ -310,23 +313,20 @@ def train(train_loader, model, criterion, criterion1, optimizer, epoch, base_bat
                                                               .format(
                    epoch, i, len(train_loader), batch_time=batch_time,
                    data_time=data_time, loss=losses, weights_loss=weights_losses, top1=top1))
-            with SummaryWriter("RAN/baseline") as writer: 
+            with SummaryWriter(summary_dir) as writer: 
                 writer.add_scalar('Trian/weight_Loss_val', weights_losses.val, epoch+(i/len(train_loader))) 
                 writer.add_scalar('Trian/acc_val', top1.val, epoch+(i/len(train_loader)))
                 writer.add_scalar('Trian/Loss_val', losses.val, epoch+(i/len(train_loader)))
-    with SummaryWriter("RAN/baseline") as writer: 
+    with SummaryWriter(summary_dir) as writer: 
         writer.add_scalar('Trian/Loss_avg', losses.avg, epoch)
         writer.add_scalar('Trian/weight_Loss_avg', weights_losses.avg, epoch)
         writer.add_scalar('Trian/acc_avg', top1.avg, epoch)
             
 def validate(val_loader, model, criterion, criterion1, epoch):
     batch_time = AverageMeter()
-    cla_losses = AverageMeter()
-    yaw_losses = AverageMeter()
     losses = AverageMeter()
     weights_losses = AverageMeter()
     top1 = AverageMeter()
-    top5 = AverageMeter()
 
     # switch to evaluate mode
     model.eval()
@@ -384,7 +384,7 @@ def validate(val_loader, model, criterion, criterion1, epoch):
                   .format(
                    i, len(val_loader), batch_time=batch_time, loss=losses, weights_loss=weights_losses,  
                    top1=top1))
-            with SummaryWriter("RAN/baseline") as writer:
+            with SummaryWriter(summary_dir) as writer:
                 writer.add_scalar('Test/Loss_val', losses.val, epoch+(i/len(val_loader)))
                 writer.add_scalar('Test/weight_Loss_val', weights_losses.val, epoch+(i/len(val_loader)))
                 writer.add_scalar('Test/acc_val', top1.val, epoch+(i/len(val_loader)))
@@ -392,7 +392,7 @@ def validate(val_loader, model, criterion, criterion1, epoch):
     print(' * Prec@1 {top1.avg} '
           .format(top1=top1))
     
-    with SummaryWriter("RAN/baseline") as writer: 
+    with SummaryWriter(summary_dir) as writer: 
         writer.add_scalar('Test/Loss_avg', losses.avg, epoch)
         writer.add_scalar('Test/weight_Loss_avg', weights_losses.avg, epoch)
         writer.add_scalar('Test/acc_avg', top1.avg, epoch)
@@ -441,17 +441,18 @@ def adjust_learning_rate(optimizer, epoch):
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
-    maxk = max(topk)
-    batch_size = target.size(0)
+    # output(B*8), target(B*1)
+    maxk = max(topk) # 1
+    batch_size = target.size(0) # B
 
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
+    _, pred = output.topk(maxk, 1, True, True) # maxk个， 第1维度（列）上，最大值，按降序排列的，索引 （B*1）
+    pred = pred.t() #1*B
+    correct = pred.eq(target.view(1, -1).expand_as(pred)) # 1*B bool
 
     res = []
     for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
-        res.append(correct_k.mul_(100.0 / batch_size))
+        correct_k = correct[:k].view(-1).float().sum(0) #求总正确数目 tensor scalar
+        res.append(correct_k.mul_(100.0 / batch_size)) #求百分比 scalar tensor
         # print("res {}".format(res))
     return res
 
