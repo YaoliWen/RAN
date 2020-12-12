@@ -73,89 +73,61 @@ best_prec1 = 0
 def main():
     global args, best_prec1
     args = parser.parse_args()
-
     print('img_dir:', args.img_dir)
     print('end2end?:', args.end2end)
-    args_img_dir='/home/phd-liu.fang/wyl/data/Alignment'
-    #args_img_dir = '/media/sdb/kwang/attention_center_crop_range_part_face/train/'
+    args_img_dir='/home/phd-liu.fang/wyl/data/Alignment' #图片位置
+
+
+
     # load data and prepare dataset
-    train_list_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_list.txt'
-    train_label_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_label.txt'
-    #train_list_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_train_center_crop_list.txt'
-    #train_label_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_train_center_crop_label.txt'
-    #train_list_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_train_center_crop_range_list.txt'
-    #train_label_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_train_center_crop_range_label.txt'
-    caffe_crop = CaffeCrop('train')
+    train_list_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_list.txt' #训练集目录txt
+    train_label_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_label.txt' #训练集标签txt
+    caffe_crop = CaffeCrop('train') # resize到224的大小
     train_dataset =  MsCelebDataset(args_img_dir, train_list_file, train_label_file, 
-            transforms.Compose([caffe_crop,transforms.ToTensor()]))
+            transforms.Compose([caffe_crop, transforms.ToTensor()])) # 用PIL.Image读取为“RGB”图像并转换为224大小的ToTensor
 
     
-    args_img_dir_val='/home/phd-liu.fang/wyl/data/Alignment'
+    args_img_dir_val='/home/phd-liu.fang/wyl/data/Alignment' # 测试集根目录
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True)
+        num_workers=args.workers, pin_memory=True) # 训练集dataloader
    
     caffe_crop = CaffeCrop('test')
     val_list_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_val_center_crop_range_list.txt'
     val_label_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_val_center_crop_range_label.txt'
-    #val_list_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_val_center_crop_list.txt'
-    #val_label_file = '/home/kwang/AAAI/attention_part_of_ferplus/ferplus_8/ferplus_val_center_crop_label.txt'
     val_dataset =  MsCelebDataset(args_img_dir_val, val_list_file, val_label_file, 
-            transforms.Compose([caffe_crop,transforms.ToTensor()]))
+            transforms.Compose([caffe_crop,transforms.ToTensor()])) # 与训练集相同
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=args.batch_size_t, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+        num_workers=args.workers, pin_memory=True) # 测试集dataloader
 
-    #assert(train_dataset.max_label == val_dataset.max_label)
     
-    
+
     # prepare model
     model = None
     assert(args.arch in ['resnet18','resnet34','resnet101'])
     if args.arch == 'resnet18':
-        #model = Res()
         model = new_resnet18(end2end=args.end2end)
-   #     model = resnet18(pretrained=False, nverts=nverts_var,faces=faces_var,shapeMU=shapeMU_var,shapePC=shapePC_var,num_classes=class_num, end2end=args.end2end)
     if args.arch == 'resnet34':
         model = resnet34(end2end=args.end2end)
     if args.arch == 'resnet101':
         pass
-    #    model = resnet101(pretrained=False,nverts=nverts_var,faces=faces_var,shapeMU=shapeMU_var,shapePC=shapePC_var, num_classes=class_num, end2end=args.end2end)
     
-#    for param in model.parameters():
-#        param.requires_grad = False
-
-    
-    # for name, p in model.named_parameters():
-    #      if not ( 'fc' in name or 'alpha' in name or 'beta' in name):
-             
-    #          p.requires_grad = False
-    #      else:
-    #          print 'updating layer :',name
-    #          print p.requires_grad
-           
-#    for param_flow in model.module.resnet18_optical_flow.parameters():
-#        param_flow.requires_grad =True
     model = torch.nn.DataParallel(model).cuda()
-    #model.module.theta.requires_grad = True
-    
-    # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
     criterion1 = attention_rank_loss.MyLoss().cuda()
-    #criterion=Cross_Entropy_Sample_Weight.CrossEntropyLoss_weight().cuda()
     optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), args.lr,
                                  momentum=args.momentum,
-                                 weight_decay=args.weight_decay)
-#    optimizer = torch.optim.SGD(model.parameters(), args.lr,
-#                                momentum=args.momentum,
-#                                weight_decay=args.weight_decay)
+                                 weight_decay=args.weight_decay) # v(t+1) = m*v(t) + g(t+1)  p(t+1) = p(t) - lr*v(t+1)   weight decay (L2 penalty)
+
+
+
+
    # optionally resume from a checkpoint
     
     if args.pretrained:
-        
-        #checkpoint = torch.load('../../Data/Model/resnet18_ms1m_ferplus_88.pth.tar')
         checkpoint = torch.load('/home/lab-wen.yaoli/CODE/git/Region-Attention-Network/checkpoint/ijba_res18_naive.pth.tar')
 
         pretrained_state_dict = checkpoint['state_dict']
@@ -164,15 +136,13 @@ def main():
         
         for key in pretrained_state_dict:
             if  ((key=='module.fc.weight')|(key=='module.fc.bias')):
-
-            #if  ((key=='module.fc.weight')|(key=='module.fc.bias')|(key == 'module.feature.weight')|(key == 'module.feature.bias')):
-                pass
+                pass # 去掉全连接层
             else:    
                 model_state_dict[key] = pretrained_state_dict[key]
 
         model.load_state_dict(model_state_dict, strict = False)
 
-    if args.resume:
+    if args.resume: #加载原本训练的模型
         if os.path.isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
@@ -195,7 +165,7 @@ def main():
         return
 
     for epoch in range(args.start_epoch, args.epochs):
-        adjust_learning_rate(optimizer, epoch)
+        adjust_learning_rate(optimizer, epoch) # epoch的(0.3、0.5、0.8)时lr *= 0.1
 
         # train for one epoch
         train(train_loader, model, criterion, criterion1, optimizer, epoch, args.batch_size_t)
@@ -217,7 +187,7 @@ def main():
         }, is_best.item())
 
 def train(train_loader, model, criterion, criterion1, optimizer, epoch, base_batch_size):
-    batch_time = AverageMeter()
+    batch_time = AverageMeter() #统计类
     data_time = AverageMeter()
     cla_losses = AverageMeter()
     yaw_losses = AverageMeter()
@@ -234,13 +204,11 @@ def train(train_loader, model, criterion, criterion1, optimizer, epoch, base_bat
 
 
     end = time.time()
-    for i, (input_first, target_first, input_second,target_second, input_third, target_third, input_forth, target_forth, input_fifth, target_fifth, input_sixth, target_sixth) in enumerate(train_loader):
+    for i, (input_first, target_first, input_second, target_second, input_third, target_third, input_forth, target_forth, input_fifth, target_fifth, input_sixth, target_sixth) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
         total_num += input_first.size(0)
         input = torch.zeros([input_first.shape[0],input_first.shape[1],input_first.shape[2],input_first.shape[3],6])
-        #input = torch.cat((input_first,input_second),0)
-        #input = torch.cat((input,input_third),0)
 
 
         input[:,:,:,:,0] = input_first
@@ -249,8 +217,7 @@ def train(train_loader, model, criterion, criterion1, optimizer, epoch, base_bat
         input[:,:,:,:,3] = input_forth
         input[:,:,:,:,4] = input_fifth
         input[:,:,:,:,5] = input_sixth
-        #input[:,:,:,:,6] = input_seventh
-        #input[:,:,:,:,7] = input_eigth
+        #放入6种图片，0为原图
         
         target = target_first
          
