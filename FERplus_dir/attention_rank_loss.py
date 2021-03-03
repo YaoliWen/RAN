@@ -160,23 +160,23 @@ class ResNet(nn.Module):
             f = x[:,:,:,:,i]
 
             f = self.conv1(f)
-            print("conv1:  {}".format(f.shape))
+            # print("conv1:  {}".format(f.shape))
             f = self.bn1(f)
             f = self.relu(f)
             f = self.maxpool(f)
-            print("maxpool:  {}".format(f.shape))
+            # print("maxpool:  {}".format(f.shape))
             f = self.layer1(f)
-            print("layer1:  {}".format(f.shape))
+            # print("layer1:  {}".format(f.shape))
             f = self.layer2(f)
-            print("layer2:  {}".format(f.shape))
+            # print("layer2:  {}".format(f.shape))
             f = self.layer3(f)
-            print("layer3:  {}".format(f.shape))
+            # print("layer3:  {}".format(f.shape))
             f = self.layer4(f)
-            print("layer4:  {}".format(f.shape))
+            # print("layer4:  {}".format(f.shape))
             f = self.avgpool(f)
-            print("avgpool: {}".format(f.shape))
+            # print("avgpool: {}".format(f.shape))
             f = f.squeeze(3).squeeze(2)
-            print("squeeze:  {}".format(f.shape))
+            # print("squeeze:  {}".format(f.shape))
             #MN_MODEL
             vs.append(f)
             alphas.append(self.alpha(f))
@@ -187,7 +187,7 @@ class ResNet(nn.Module):
         alphas_part_max = alphas_stack[:,:,0:5].max(dim=2)[0]
         # alphas_part_max = alphas_stack[:,:,0:3].mean(dim=2)
         alphas_org = alphas_stack[:,:,5]
-        print("alphas_org:  {}".format(alphas_org.shape))
+        # print("alphas_org:  {}".format(alphas_org.shape))
         vm = vs_stack.mul(alphas_stack).sum(2).div(alphas_stack.sum(2))
         # pdb.set_trace()
         for i in range(len(vs)):

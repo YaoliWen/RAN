@@ -23,10 +23,11 @@ import scipy.io as sio
 import numpy as np
 import pdb
 from torch.utils.tensorboard import SummaryWriter
+base_name_file = "model_1/"
+summary_dir = os.path.join("/157Dataset/data-wen.yaoli/CODE/tensorboard", base_name_file)
+checkp_dir = os.path.join("/157Dataset/data-wen.yaoli/CODE/CHECKpoint", base_name_file)
 
-summary_dir = "/157Dataset/data-wen.yaoli/RAN/baseline"
-
-os.environ['CUDA_VISIBLE_DEVICES'] = '4,5,6'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
@@ -47,9 +48,10 @@ parser.add_argument('--epochs', default=80, type=int, metavar='N',
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
 # default = 128
-parser.add_argument('-b', '--batch-size', default=64, type=int,
+parser.add_argument('-b', '--batch-size', default=40, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
-parser.add_argument('-b_t', '--batch-size_t', default=64, type=int,
+# default 64
+parser.add_argument('-b_t', '--batch-size_t', default=20 , type=int,
                     metavar='N', help='mini-batch size (default: 256)')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     metavar='LR', help='initial learning rate')
@@ -77,33 +79,33 @@ def main():
     args = parser.parse_args()
     print('img_dir:', args.img_dir)
     print('end2end?:', args.end2end)
-    args_img_dir='/home/phd-liu.fang/wyl/data/Alignment' #对齐的面部地址
+    args_img_dir='/157Dataset/data-wen.yaoli/CODE/RAN/data/Alignment' #对齐的面部地址
 
 
 
     # load data and prepare dataset
-    train_list_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_list.txt' #训练集目录txt
-    train_label_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_label.txt' #训练集标签txt
+    train_list_file = '/157Dataset/data-wen.yaoli/CODE/RAN/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_list.txt' #训练集目录txt
+    train_label_file = '/157Dataset/data-wen.yaoli/CODE/RAN/RAN/FERplus_dir/dlib_ferplus_train_center_crop_range_label.txt' #训练集标签txt
     caffe_crop = CaffeCrop('train') # resize到224的大小
     train_dataset =  MsCelebDataset(args_img_dir, train_list_file, train_label_file, 
             transforms.Compose([caffe_crop, transforms.ToTensor()])) # 用PIL.Image读取为“RGB”图像并转换为224大小的ToTensor
 
     
-    args_img_dir_val='/home/phd-liu.fang/wyl/data/Alignment' # 测试集根目录
+    args_img_dir_val='/157Dataset/data-wen.yaoli/CODE/RAN/data/Alignment' # 测试集根目录
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True) # 训练集dataloader
+        num_workers=args.workers, pin_memory=True) # 训练集dataloader pin_memory=True
    
     caffe_crop = CaffeCrop('test')
-    val_list_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_val_center_crop_range_list.txt'
-    val_label_file = '/home/phd-liu.fang/wyl/RAN/FERplus_dir/dlib_ferplus_val_center_crop_range_label.txt'
+    val_list_file = '/157Dataset/data-wen.yaoli/CODE/RAN/RAN/FERplus_dir/dlib_ferplus_val_center_crop_range_list.txt'
+    val_label_file = '/157Dataset/data-wen.yaoli/CODE/RAN/RAN/FERplus_dir/dlib_ferplus_val_center_crop_range_label.txt'
     val_dataset =  MsCelebDataset(args_img_dir_val, val_list_file, val_label_file, 
             transforms.Compose([caffe_crop,transforms.ToTensor()])) # 与训练集相同
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=args.batch_size_t, shuffle=False,
-        num_workers=args.workers, pin_memory=True) # 测试集dataloader
+        num_workers=args.workers, pin_memory=True) # 测试集dataloader(pin_memory default = True)
 
     
 
@@ -111,6 +113,7 @@ def main():
     model = None
     assert(args.arch in ['resnet18','resnet34','resnet101'])
     if args.arch == 'resnet18':
+        # model = resnet18(end2end=args.end2end)
         model = new_resnet18(end2end=args.end2end)
     if args.arch == 'resnet34':
         model = resnet34(end2end=args.end2end)
@@ -130,7 +133,7 @@ def main():
    # optionally resume from a checkpoint
     
     if args.pretrained:
-        checkpoint = torch.load('/home/lab-wen.yaoli/CODE/git/Region-Attention-Network/checkpoint/ijba_res18_naive.pth.tar')
+        checkpoint = torch.load('/157Dataset/data-wen.yaoli/CODE/RAN/data/checkpoint/ijba_res18_naive.pth.tar')
 
         pretrained_state_dict = checkpoint['state_dict']
         model_state_dict = model.state_dict()
@@ -200,7 +203,8 @@ def train(train_loader, model, criterion, criterion1, optimizer, epoch, base_bat
     batch_loss = 0
     batch_size = 0
     total_num = 0
-    loss_freq = 128//base_batch_size
+    loss_freq = 128//128
+    # loss_freq = 128//base_batch_size
     # switch to train mode
     model.train()
 
@@ -280,9 +284,9 @@ def train(train_loader, model, criterion, criterion1, optimizer, epoch, base_bat
                    epoch, i, len(train_loader), batch_time=batch_time,
                    data_time=data_time, loss=losses, weights_loss=weights_losses, top1=top1))
             with SummaryWriter(summary_dir) as writer: 
-                writer.add_scalar('Trian/weight_Loss_val', weights_losses.val, epoch+(i/len(train_loader))) 
-                writer.add_scalar('Trian/acc_val', top1.val, epoch+(i/len(train_loader)))
-                writer.add_scalar('Trian/Loss_val', losses.val, epoch+(i/len(train_loader)))
+                writer.add_scalar('Trian/weight_Loss_val', weights_losses.val, epoch*len(train_loader)+i) 
+                writer.add_scalar('Trian/acc_val', top1.val, epoch*len(train_loader)+i)
+                writer.add_scalar('Trian/Loss_val', losses.val, epoch*len(train_loader)+i)
     with SummaryWriter(summary_dir) as writer: 
         writer.add_scalar('Trian/Loss_avg', losses.avg, epoch)
         writer.add_scalar('Trian/weight_Loss_avg', weights_losses.avg, epoch)
@@ -351,9 +355,9 @@ def validate(val_loader, model, criterion, criterion1, epoch):
                    i, len(val_loader), batch_time=batch_time, loss=losses, weights_loss=weights_losses,  
                    top1=top1))
             with SummaryWriter(summary_dir) as writer:
-                writer.add_scalar('Test/Loss_val', losses.val, epoch+(i/len(val_loader)))
-                writer.add_scalar('Test/weight_Loss_val', weights_losses.val, epoch+(i/len(val_loader)))
-                writer.add_scalar('Test/acc_val', top1.val, epoch+(i/len(val_loader)))
+                writer.add_scalar('Test/Loss_val', losses.val, epoch*len(val_loader)+i)
+                writer.add_scalar('Test/weight_Loss_val', weights_losses.val, epoch*len(val_loader)+i)
+                writer.add_scalar('Test/acc_val', top1.val, epoch*len(val_loader)+i)
 
     print(' * Prec@1 {top1.avg} '
           .format(top1=top1))
@@ -366,11 +370,10 @@ def validate(val_loader, model, criterion, criterion1, epoch):
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
-
-    full_filename = os.path.join(args.model_dir, filename)
-    full_bestname = os.path.join(args.model_dir, 'model_best.pth.tar')
-    if not os.path.isdir(args.model_dir):
-        os.makedirs(args.model_dir)
+    full_filename = os.path.join(checkp_dir, filename)
+    full_bestname = os.path.join(checkp_dir, 'model_best.pth.tar')
+    if not os.path.isdir(checkp_dir):
+        os.makedirs(checkp_dir)
     torch.save(state, full_filename)
     epoch_num = state['epoch']
     if epoch_num%1==0 and epoch_num>=0:
